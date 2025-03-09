@@ -1,18 +1,18 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { Card, CardContent } from "@/components/ui/card"
-import { cn } from "@/lib/utils"
+import { useState, useEffect } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 export interface RedditComment {
-  id: string
-  author: string
-  body: string
-  score: number
-  created: number
-  permalink?: string
-  avatar?: string
-  isNew?: boolean
+  id: string;
+  author: string;
+  body: string;
+  score: number;
+  created: number;
+  permalink?: string;
+  avatar?: string;
+  isNew?: boolean;
 }
 
 interface CommentProps {
@@ -52,20 +52,38 @@ export default function Comment({
 
   // Use specific Tailwind blue classes that we know exist
   const getHighlightColor = () => {
-    if (!isNew) return "border-l-gray-200";
+    if (!isNew) return "border-l-zinc-200";
     switch (newIndex) {
       case 0:
-        return "border-l-blue-600";
+        return "border-l-zinc-600";
       case 1:
-        return "border-l-blue-500";
+        return "border-l-zinc-500";
       case 2:
-        return "border-l-blue-400";
+        return "border-l-zinc-400";
       case 3:
-        return "border-l-blue-400";
+        return "border-l-zinc-400";
       case 4:
-        return "border-l-blue-300";
+        return "border-l-zinc-300";
       default:
-        return "border-l-gray-200";
+        return "border-l-stone-200";
+    }
+  };
+
+  const getbgColor = () => {
+    if (!isNew) return "bg-stone-50";
+    switch (newIndex) {
+      case 0:
+        return "bg-stone-300";
+      case 1:
+        return "bg-stone-200";
+      case 2:
+        return "bg-stone-100";
+      case 3:
+        return "bg-stone-100";
+      case 4:
+        return "bg-stone-100";
+      default:
+        return "bg-stone-100";
     }
   };
 
@@ -78,13 +96,18 @@ export default function Comment({
           : "opacity-0 transform -translate-y-4"
       )}
     >
-      <Card className={cn("border-l-4", getHighlightColor())}>
-        <CardContent className="p-3 hover:bg-gray-100">
+      <Card
+        className={cn(
+          "border-l-4 hover:border-l-zinc-600",
+          getHighlightColor()
+        )}
+      >
+        <CardContent className={cn("p-3 hover:bg-stone-400", getbgColor())}>
           <div className="flex items-start space-x-3">
             <div className="flex-1 min-w-0">
               <div className="flex items-center space-x-2">
                 <div className="font-medium truncate">{comment.author}</div>
-                <div className="text-xs text-gray-500">
+                <div className="text-xs text-gray-600">
                   {timeAgo(comment.created)}
                 </div>
               </div>
@@ -96,4 +119,3 @@ export default function Comment({
     </div>
   );
 }
-

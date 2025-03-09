@@ -21,6 +21,7 @@ export default function RedditLiveComments() {
   const [displayedComments, setDisplayedComments] = useState<RedditComment[]>([])
   const [queuedComments, setQueuedComments] = useState<RedditComment[]>([])
   const [seenComments, setSeenComments] = useState<Set<string>>(new Set())
+  const [effectiveDisplayRate, setEffectiveDisplayRate] = useState(displayRate);
 
   const {
     comments,
@@ -66,49 +67,76 @@ export default function RedditLiveComments() {
 
   useEffect(() => {
     if (comments.length > 0 && seenComments.size === 0) {
-      const initialComments = comments.slice(0, 10);
+      // Initial load of 10 comments
+      const initialComments = comments.slice(0, 30);
       setSeenComments(new Set(comments.map((comment) => comment.id)));
       setQueuedComments([...initialComments].reverse());
-      setDisplayedComments([])
+      setDisplayedComments([]);
     } else if (comments.length > 0) {
       const newComments = comments.filter(
-        comment => !seenComments.has(comment.id)
+        (comment) => !seenComments.has(comment.id)
       );
-      
+
       if (newComments.length > 0) {
         setSeenComments((prev) => {
           const updated = new Set(prev);
           newComments.forEach((comment) => updated.add(comment.id));
           return updated;
         });
-        setQueuedComments((prev) => [...prev, ...newComments]);
+
+        setQueuedComments((prev) => {
+          const maxQueueSize = Math.floor(refreshRate / displayRate) * 5;
+          const newQueue = [...prev, ...newComments.reverse()]; // Reverse new comments to maintain chronological order
+          const slicedQueue = newQueue.slice(-maxQueueSize);
+          return slicedQueue;
+        });
       }
     }
-  }, [comments]);
+  }, [comments, refreshRate, displayRate]);
 
+  useEffect(() => {
+    if (queuedComments.length > 0) {
+      // Dynamically adjust display rate based on queue size
+      const maxQueueSize = Math.floor(refreshRate / displayRate) * 5;
+      const queuePercentage = queuedComments.length / maxQueueSize;
+
+      // Speed up display rate if queue is more than 50% full
+      if (queuePercentage > 0.5) {
+        const newRate = Math.max(
+          0.2,
+          displayRate * (1 - queuePercentage * 0.8)
+        );
+        setEffectiveDisplayRate(newRate);
+      } else {
+        setEffectiveDisplayRate(displayRate);
+      }
+    }
+  }, [queuedComments.length, refreshRate, displayRate]);
+
+  // Update the comment display interval to use effectiveDisplayRate
   useEffect(() => {
     let intervalId: NodeJS.Timeout;
 
     if (queuedComments.length > 0) {
       intervalId = setInterval(() => {
-        setQueuedComments(prev => {
-          if (prev.length === 0) return prev
-          const [nextComment, ...remainingQueue] = prev
-          setDisplayedComments(current => {
-            if (!current.some(c => c.id === nextComment.id)) {
-              return [nextComment, ...current]
+        setQueuedComments((prev) => {
+          if (prev.length === 0) return prev;
+          const [nextComment, ...remainingQueue] = prev;
+          setDisplayedComments((current) => {
+            if (!current.some((c) => c.id === nextComment.id)) {
+              return [nextComment, ...current];
             }
-            return current
-          })
-          return remainingQueue
-        })
-      }, displayRate * 1000);
+            return current;
+          });
+          return remainingQueue;
+        });
+      }, effectiveDisplayRate * 1000);
     }
 
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
-  }, [queuedComments.length, displayRate]);
+  }, [queuedComments.length, effectiveDisplayRate]);
 
   useEffect(() => {
     setSeenComments(new Set());
@@ -139,10 +167,24 @@ export default function RedditLiveComments() {
         )}
         <div className="flex items-center justify-between p-4">
           <div className="flex-1 truncate font-medium">
-            {postTitle ? postTitle : "Reddit Live Comments"}
+            {postTitle ? postTitle : "🏏 Reddit Live Comments"}
+            <br />
             {queuedComments.length > 0 && (
-              <span className="ml-2 text-xs text-gray-500">
-                ({queuedComments.length} in queue)
+              <span className="text-xs text-gray-500">
+                ({queuedComments.length} in queue), display rate:{" "}
+                {effectiveDisplayRate.toFixed(2)} sec/comment, Max queue size:{" "}
+                {Math.floor(refreshRate / displayRate) * 5}, New comments:{" "}
+                {
+                  comments.filter(
+                    (c) => !Array.from(seenComments).includes(c.id)
+                  ).length
+                }
+                , Dropped:{" "}
+                {Math.max(
+                  0,
+                  queuedComments.length -
+                    Math.floor(refreshRate / displayRate) * 5
+                )}
               </span>
             )}
           </div>
@@ -197,7 +239,7 @@ export default function RedditLiveComments() {
                 <Slider
                   id="refresh-rate"
                   min={1}
-                  max={30}
+                  max={60}
                   step={1}
                   value={[refreshRate]}
                   onValueChange={(value) => setRefreshRate(value[0])}
@@ -214,7 +256,7 @@ export default function RedditLiveComments() {
                 <Slider
                   id="display-rate"
                   min={0.5}
-                  max={5}
+                  max={10}
                   step={0.5}
                   value={[displayRate]}
                   onValueChange={(value) => setDisplayRate(value[0])}
