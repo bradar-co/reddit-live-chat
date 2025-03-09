@@ -66,9 +66,9 @@ export default function RedditLiveComments() {
 
   useEffect(() => {
     if (comments.length > 0 && seenComments.size === 0) {
-      const uniqueComments = [...new Map(comments.map(c => [c.id, c])).values()]
-      setSeenComments(new Set(uniqueComments.map(comment => comment.id)))
-      setQueuedComments([...uniqueComments].reverse())
+      const initialComments = comments.slice(0, 10);
+      setSeenComments(new Set(comments.map((comment) => comment.id)));
+      setQueuedComments([...initialComments].reverse());
       setDisplayedComments([])
     } else if (comments.length > 0) {
       const newComments = comments.filter(
@@ -76,13 +76,12 @@ export default function RedditLiveComments() {
       );
       
       if (newComments.length > 0) {
-        const uniqueNewComments = [...new Map(newComments.map(c => [c.id, c])).values()]
-        setSeenComments(prev => {
-          const updated = new Set(prev)
-          uniqueNewComments.forEach(comment => updated.add(comment.id))
-          return updated
-        })
-        setQueuedComments(prev => [...prev, ...uniqueNewComments])
+        setSeenComments((prev) => {
+          const updated = new Set(prev);
+          newComments.forEach((comment) => updated.add(comment.id));
+          return updated;
+        });
+        setQueuedComments((prev) => [...prev, ...newComments]);
       }
     }
   }, [comments]);
@@ -133,9 +132,19 @@ export default function RedditLiveComments() {
   return (
     <div className="h-screen flex flex-col bg-white">
       <div className="border-b">
+        {isFetching && (
+          <div className="fill-blue-600">
+            <Progress value={progress} className="h-1 bg-gray-200" />
+          </div>
+        )}
         <div className="flex items-center justify-between p-4">
           <div className="flex-1 truncate font-medium">
             {postTitle ? postTitle : "Reddit Live Comments"}
+            {queuedComments.length > 0 && (
+              <span className="ml-2 text-xs text-gray-500">
+                ({queuedComments.length} in queue)
+              </span>
+            )}
           </div>
           <Button
             variant="ghost"
@@ -145,11 +154,6 @@ export default function RedditLiveComments() {
             <Settings className="h-5 w-5" />
           </Button>
         </div>
-        {isFetching && (
-          <div className="fill-blue-600">
-            <Progress value={progress} className="h-1 bg-gray-200" />
-          </div>
-        )}
       </div>
 
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -243,6 +247,7 @@ export default function RedditLiveComments() {
                   key={comment.id}
                   comment={comment}
                   isNew={index < 5}
+                  newIndex={index}
                 />
               ))}
             </div>
