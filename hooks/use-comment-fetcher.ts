@@ -111,8 +111,11 @@ export function useCommentFetcher(postUrl: string | null, interval: number = 300
         }
 
         // Create script element
+        // Use old.reddit.com: www.reddit.com is behind a WAF that no longer serves
+        // the JSONP-wrapped response (it returns a block page, tripping script.onerror).
+        // old.reddit.com still honors ?jsonp= and returns executable callback(...) JS.
         const script = document.createElement("script")
-        script.src = `https://www.reddit.com/comments/${postId}.json?jsonp=${callbackName}`
+        script.src = `https://old.reddit.com/comments/${postId}.json?limit=100&sort=new&raw_json=1&jsonp=${callbackName}`
         script.onerror = () => {
           document.body.removeChild(script)
           delete window[callbackName as any]
