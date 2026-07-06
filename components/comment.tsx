@@ -7,10 +7,7 @@ export interface RedditComment {
   id: string;
   author: string;
   body: string;
-  score: number;
   created: number;
-  permalink?: string;
-  avatar?: string;
   isNew?: boolean;
   replies?: RedditComment[];
 }
@@ -92,7 +89,7 @@ export default function Comment({
               type="button"
               onClick={() => onToggle(comment.id)}
               aria-expanded={expanded}
-              className="mt-1.5 -ml-1.5 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+              className="mt-1 -ml-1.5 inline-flex items-center gap-1 rounded-md px-1.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <ChevronRight
                 aria-hidden

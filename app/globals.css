@@ -2,12 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
-}
-
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -29,8 +23,8 @@
     --border: 0 0% 90%;
     --input: 0 0% 90%;
     --ring: 14 100% 47%;
-    /* Reddit-orange brand accent */
-    --brand: 14 100% 47%;
+    /* Reddit-orange brand accent — 42% L keeps white text ≥4.5:1 on the button */
+    --brand: 14 100% 42%;
     --brand-foreground: 0 0% 100%;
     --radius: 0.5rem;
   }
@@ -54,7 +48,7 @@
     --border: 0 0% 17%;
     --input: 0 0% 20%;
     --ring: 14 100% 55%;
-    --brand: 14 100% 55%;
+    --brand: 14 100% 42%;
     --brand-foreground: 0 0% 100%;
   }
 }
@@ -91,7 +85,8 @@
 @media (prefers-reduced-motion: reduce) {
   .animate-comment-in,
   .animate-highlight-fade,
-  .animate-live-pulse {
+  .animate-live-pulse,
+  .animate-countdown {
     animation: none !important;
   }
 }

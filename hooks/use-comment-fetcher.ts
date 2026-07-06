@@ -10,9 +10,7 @@ function mapCommentNode(d: any): RedditComment {
     id: d.id,
     author: d.author || "[deleted]",
     body: d.body || "[removed]",
-    score: d.score || 0,
     created: d.created_utc || Date.now() / 1000,
-    permalink: d.permalink,
     replies: parseReplyListing(d.replies),
   }
 }
@@ -180,6 +178,7 @@ export function useCommentFetcher(postUrl: string | null, interval: number = 300
       intervalRef.current = null
     }
     setIsFetching(false)
+    setError(null) // a stale fetch error shouldn't linger after the user stops
   }, [])
 
   // Cleanup on unmount

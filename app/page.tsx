@@ -4,25 +4,22 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Settings, MessageSquareText } from "lucide-react";
+import { Settings, MessageSquareText, WifiOff } from "lucide-react";
 import Comment, { RedditComment } from "@/components/comment";
 import { useCommentFetcher } from "@/hooks/use-comment-fetcher";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function RedditLiveComments() {
   const [postUrl, setPostUrl] = useState("");
-  const [isValidUrl, setIsValidUrl] = useState(false);
   const [refreshRate, setRefreshRate] = useState(5); // seconds
   const [showSettings, setShowSettings] = useState(true);
-  const [postTitle, setPostTitle] = useState("");
-  const [progress, setProgress] = useState(100);
   const commentsContainerRef = useRef<HTMLDivElement>(null);
   const [displayRate, setDisplayRate] = useState(1); // seconds per comment
   const [displayedComments, setDisplayedComments] = useState<RedditComment[]>([])
   const [queuedComments, setQueuedComments] = useState<RedditComment[]>([])
-  const [seenComments, setSeenComments] = useState<Set<string>>(new Set())
   const [effectiveDisplayRate, setEffectiveDisplayRate] = useState(displayRate);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const seededRef = useRef(false); // has the first fetched batch seeded the feed?
 
   const toggleExpanded = useCallback((id: string) => {
     setExpandedIds((prev) => {
@@ -44,63 +41,31 @@ export default function RedditLiveComments() {
   } = useCommentFetcher(postUrl, refreshRate);
 
   useEffect(() => {
-    if (title) {
-      setPostTitle(title);
-    }
-  }, [title]);
-
-  useEffect(() => {
     if (commentsContainerRef.current && comments.length > 0) {
       commentsContainerRef.current.scrollTop = 0;
     }
   }, [comments]);
 
+  // Feed the queue. The fetcher already dedupes and flags each fresh comment
+  // with `isNew`, so we don't track seen ids here — we just react to that flag.
   useEffect(() => {
-    let intervalId: NodeJS.Timeout;
+    if (comments.length === 0) return;
 
-    if (isFetching) {
-      const startTime = Date.now();
-      const updateProgress = () => {
-        const elapsed = Date.now() - startTime;
-        const remaining = refreshRate * 1000 - (elapsed % (refreshRate * 1000));
-        setProgress((remaining / (refreshRate * 1000)) * 100);
-      };
-
-      intervalId = setInterval(updateProgress, 100);
-      updateProgress();
+    if (!seededRef.current) {
+      // First batch: seed the feed with the newest 30, oldest-first so they
+      // reveal in chronological order.
+      seededRef.current = true;
+      setQueuedComments([...comments.slice(0, 30)].reverse());
+      setDisplayedComments([]);
+      return;
     }
 
-    return () => {
-      if (intervalId) clearInterval(intervalId);
-    };
-  }, [isFetching, refreshRate]);
-
-  useEffect(() => {
-    if (comments.length > 0 && seenComments.size === 0) {
-      // Initial load of 10 comments
-      const initialComments = comments.slice(0, 30);
-      setSeenComments(new Set(comments.map((comment) => comment.id)));
-      setQueuedComments([...initialComments].reverse());
-      setDisplayedComments([]);
-    } else if (comments.length > 0) {
-      const newComments = comments.filter(
-        (comment) => !seenComments.has(comment.id)
-      );
-
-      if (newComments.length > 0) {
-        setSeenComments((prev) => {
-          const updated = new Set(prev);
-          newComments.forEach((comment) => updated.add(comment.id));
-          return updated;
-        });
-
-        setQueuedComments((prev) => {
-          const maxQueueSize = Math.floor(refreshRate / displayRate) * 5;
-          const newQueue = [...prev, ...newComments.reverse()]; // Reverse new comments to maintain chronological order
-          const slicedQueue = newQueue.slice(-maxQueueSize);
-          return slicedQueue;
-        });
-      }
+    const fresh = comments.filter((c) => c.isNew);
+    if (fresh.length > 0) {
+      setQueuedComments((prev) => {
+        const maxQueueSize = Math.floor(refreshRate / displayRate) * 5;
+        return [...prev, ...fresh.reverse()].slice(-maxQueueSize);
+      });
     }
   }, [comments, refreshRate, displayRate]);
 
@@ -149,20 +114,14 @@ export default function RedditLiveComments() {
   }, [queuedComments.length, effectiveDisplayRate]);
 
   useEffect(() => {
-    setSeenComments(new Set());
+    seededRef.current = false;
     setQueuedComments([]);
     setDisplayedComments([]);
     setExpandedIds(new Set());
   }, [postUrl]);
 
-  const validateUrl = (url: string) =>
-    url.includes("reddit.com") && url.includes("/comments/");
-
-  const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const url = e.target.value;
-    setPostUrl(url);
-    setIsValidUrl(validateUrl(url));
-  };
+  const isValidUrl =
+    postUrl.includes("reddit.com") && postUrl.includes("/comments/");
 
   const handleStartFetching = () => {
     if (isValidUrl) {
@@ -177,12 +136,13 @@ export default function RedditLiveComments() {
     <div className="flex h-[100dvh] flex-col bg-background text-foreground">
       {/* Header */}
       <header className="sticky top-0 z-20 border-b border-border bg-background/95 shadow-sm backdrop-blur-md supports-[backdrop-filter]:bg-background/90">
-        {/* Refresh countdown line */}
+        {/* Refresh countdown line — pure CSS, one cycle per refresh interval */}
         <div className="h-0.5 w-full bg-transparent">
           {isFetching && (
             <div
-              className="h-full bg-brand transition-[width] duration-100 ease-linear"
-              style={{ width: `${progress}%` }}
+              key={refreshRate}
+              className="h-full origin-left bg-brand animate-countdown"
+              style={{ animationDuration: `${refreshRate}s` }}
             />
           )}
         </div>
@@ -194,18 +154,23 @@ export default function RedditLiveComments() {
                 <span className="h-1.5 w-1.5 rounded-full bg-brand animate-live-pulse" />
                 Live
               </span>
+            ) : hasFeed ? (
+              <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60" />
+                Paused
+              </span>
             ) : (
               <MessageSquareText className="h-5 w-5 shrink-0 text-brand" />
             )}
 
             <div className="min-w-0">
-              <h1 className="truncate text-sm font-semibold leading-tight text-foreground">
-                {postTitle || "Reddit Live Comments"}
+              <h1 className="truncate text-base font-semibold leading-tight text-foreground">
+                {title || "Reddit Live Comments"}
               </h1>
-              {isFetching && (
+              {(isFetching || hasFeed) && (
                 <p className="truncate text-xs text-muted-foreground">
                   {displayedComments.length.toLocaleString()} shown
-                  {queuedComments.length > 0 && (
+                  {isFetching && queuedComments.length > 0 && (
                     <> · {queuedComments.length} incoming</>
                   )}
                 </p>
@@ -241,7 +206,7 @@ export default function RedditLiveComments() {
                   id="post-url"
                   placeholder="https://reddit.com/r/…/comments/…"
                   value={postUrl}
-                  onChange={handleUrlChange}
+                  onChange={(e) => setPostUrl(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && isValidUrl && !isFetching) {
                       handleStartFetching();
@@ -282,6 +247,7 @@ export default function RedditLiveComments() {
                   value={[refreshRate]}
                   onValueChange={(value) => setRefreshRate(value[0])}
                   disabled={isFetching}
+                  className="data-[disabled]:opacity-50"
                 />
               </div>
 
@@ -302,6 +268,7 @@ export default function RedditLiveComments() {
                   value={[displayRate]}
                   onValueChange={(value) => setDisplayRate(value[0])}
                   disabled={isFetching}
+                  className="data-[disabled]:opacity-50"
                 />
               </div>
             </div>
@@ -309,9 +276,12 @@ export default function RedditLiveComments() {
         </div>
       )}
 
-      {error && (
+      {/* While comments are already on screen, a transient error is a thin banner.
+          With nothing shown yet, the error takes over the empty state below instead
+          of coexisting with a "waiting for comments…" message that will never resolve. */}
+      {error && hasFeed && (
         <div className="mx-auto w-full max-w-2xl px-4 pt-3">
-          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive dark:text-red-400">
             {error}
           </div>
         </div>
@@ -324,7 +294,7 @@ export default function RedditLiveComments() {
       >
         <div className="mx-auto w-full max-w-2xl px-2 py-3 sm:px-4">
           {!hasFeed && !isLoading ? (
-            <EmptyState isFetching={isFetching} />
+            <EmptyState isFetching={isFetching} error={error} />
           ) : (
             <div className="flex flex-col gap-0.5">
               {displayedComments.map((comment) => (
@@ -350,7 +320,28 @@ export default function RedditLiveComments() {
   );
 }
 
-function EmptyState({ isFetching }: { isFetching: boolean }) {
+function EmptyState({
+  isFetching,
+  error,
+}: {
+  isFetching: boolean;
+  error: string | null;
+}) {
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 px-6 py-24 text-center">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
+          <WifiOff className="h-6 w-6 text-destructive dark:text-red-400" />
+        </div>
+        <p className="text-sm font-medium text-foreground">Can&apos;t reach Reddit right now</p>
+        <p className="max-w-xs text-sm text-muted-foreground">
+          Reddit may be rate-limiting or blocking the request.
+          {isFetching ? " Retrying automatically…" : " Press Start to try again."}
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col items-center justify-center gap-3 px-6 py-24 text-center">
       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-brand/10">

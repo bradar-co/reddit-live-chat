@@ -11,21 +11,20 @@ export function ThemeToggle() {
 
   React.useEffect(() => setMounted(true), [])
 
-  const isDark = resolvedTheme === "dark"
+  // Gate everything theme-dependent on `mounted` so the server render and the
+  // first client render match — otherwise the aria-label/icon hydrate mismatched.
+  const isDark = mounted && resolvedTheme === "dark"
 
   return (
     <Button
       variant="ghost"
       size="icon"
-      aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+      aria-label={
+        !mounted ? "Toggle theme" : isDark ? "Switch to light mode" : "Switch to dark mode"
+      }
       onClick={() => setTheme(isDark ? "light" : "dark")}
     >
-      {/* Render a stable icon until mounted to avoid hydration mismatch */}
-      {mounted && isDark ? (
-        <Sun className="h-5 w-5" />
-      ) : (
-        <Moon className="h-5 w-5" />
-      )}
+      {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
     </Button>
   )
 }
