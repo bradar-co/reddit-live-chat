@@ -1,13 +1,13 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useRef } from "react"
-import { Slider } from "@/components/ui/slider"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { Progress } from "@/components/ui/progress"
-import { Settings } from "lucide-react"
+import { useState, useEffect, useRef } from "react";
+import { Slider } from "@/components/ui/slider";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Settings, MessageSquareText } from "lucide-react";
 import Comment, { RedditComment } from "@/components/comment";
 import { useCommentFetcher } from "@/hooks/use-comment-fetcher";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function RedditLiveComments() {
   const [postUrl, setPostUrl] = useState("");
@@ -144,10 +144,13 @@ export default function RedditLiveComments() {
     setDisplayedComments([]);
   }, [postUrl]);
 
+  const validateUrl = (url: string) =>
+    url.includes("reddit.com") && url.includes("/comments/");
+
   const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const url = e.target.value;
     setPostUrl(url);
-    setIsValidUrl(url.includes("reddit.com") && url.includes("/comments/"));
+    setIsValidUrl(validateUrl(url));
   };
 
   const handleStartFetching = () => {
@@ -157,84 +160,108 @@ export default function RedditLiveComments() {
     }
   };
 
+  const hasFeed = displayedComments.length > 0 || queuedComments.length > 0;
+
   return (
-    <div className="h-screen flex flex-col bg-white">
-      <div className="border-b">
-        {isFetching && (
-          <div className="fill-blue-600">
-            <Progress value={progress} className="h-1 bg-gray-200" />
-          </div>
-        )}
-        <div className="flex items-center justify-between p-4">
-          <div className="flex-1 truncate font-medium">
-            {postTitle ? postTitle : "🏏 Reddit Live Comments"}
-            <br />
-            {queuedComments.length > 0 && (
-              <span className="text-xs text-gray-500">
-                ({queuedComments.length} in queue), display rate:{" "}
-                {effectiveDisplayRate.toFixed(2)} sec/comment, Max queue size:{" "}
-                {Math.floor(refreshRate / displayRate) * 5}, New comments:{" "}
-                {
-                  comments.filter(
-                    (c) => !Array.from(seenComments).includes(c.id)
-                  ).length
-                }
-                , Dropped:{" "}
-                {Math.max(
-                  0,
-                  queuedComments.length -
-                    Math.floor(refreshRate / displayRate) * 5
-                )}
-              </span>
-            )}
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setShowSettings(!showSettings)}
-          >
-            <Settings className="h-5 w-5" />
-          </Button>
+    <div className="flex h-[100dvh] flex-col bg-background text-foreground">
+      {/* Header */}
+      <header className="sticky top-0 z-20 border-b border-border bg-background/80 backdrop-blur-md">
+        {/* Refresh countdown line */}
+        <div className="h-0.5 w-full bg-transparent">
+          {isFetching && (
+            <div
+              className="h-full bg-brand transition-[width] duration-100 ease-linear"
+              style={{ width: `${progress}%` }}
+            />
+          )}
         </div>
-      </div>
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {showSettings && (
-          <div className="p-4 border-b bg-gray-50">
-            <div className="flex flex-col space-y-4 max-w-2xl mx-auto">
-              <div className="space-y-2">
-                <label htmlFor="post-url" className="text-sm font-medium">
-                  Reddit Post URL
-                </label>
-                <div className="flex space-x-2">
-                  <Input
-                    id="post-url"
-                    placeholder="https://www.reddit.com/r/subreddit/comments/..."
-                    value={postUrl}
-                    onChange={(e) => {
-                      setPostUrl(e.target.value);
-                      setIsValidUrl(
-                        e.target.value.includes("reddit.com") &&
-                          e.target.value.includes("/comments/")
-                      );
-                    }}
-                    className="flex-1"
-                  />
-                  <Button
-                    onClick={isFetching ? stopFetching : handleStartFetching}
-                    disabled={!isValidUrl && !isFetching}
-                    variant={isFetching ? "destructive" : "default"}
-                  >
-                    {isFetching ? "Stop" : "Start"}
-                  </Button>
-                </div>
+        <div className="mx-auto flex w-full max-w-2xl items-center gap-3 px-4 py-3">
+          <div className="flex min-w-0 flex-1 items-center gap-2.5">
+            {isFetching ? (
+              <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-foreground">
+                <span className="h-1.5 w-1.5 rounded-full bg-brand animate-live-pulse" />
+                Live
+              </span>
+            ) : (
+              <MessageSquareText className="h-5 w-5 shrink-0 text-brand" />
+            )}
+
+            <div className="min-w-0">
+              <h1 className="truncate text-sm font-semibold leading-tight text-foreground">
+                {postTitle || "Reddit Live Comments"}
+              </h1>
+              {isFetching && (
+                <p className="truncate text-xs text-muted-foreground">
+                  {displayedComments.length.toLocaleString()} shown
+                  {queuedComments.length > 0 && (
+                    <> · {queuedComments.length} incoming</>
+                  )}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-1">
+            <ThemeToggle />
+            <Button
+              variant={showSettings ? "secondary" : "ghost"}
+              size="icon"
+              aria-label="Settings"
+              aria-pressed={showSettings}
+              onClick={() => setShowSettings((s) => !s)}
+            >
+              <Settings className="h-5 w-5" />
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      {/* Settings */}
+      {showSettings && (
+        <div className="border-b border-border bg-muted/40">
+          <div className="mx-auto flex w-full max-w-2xl flex-col gap-5 px-4 py-4">
+            <div className="space-y-1.5">
+              <label htmlFor="post-url" className="text-xs font-medium text-muted-foreground">
+                Reddit post URL
+              </label>
+              <div className="flex gap-2">
+                <Input
+                  id="post-url"
+                  placeholder="https://reddit.com/r/…/comments/…"
+                  value={postUrl}
+                  onChange={handleUrlChange}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && isValidUrl && !isFetching) {
+                      handleStartFetching();
+                    }
+                  }}
+                  className="flex-1 bg-background"
+                />
+                <Button
+                  onClick={isFetching ? stopFetching : handleStartFetching}
+                  disabled={!isValidUrl && !isFetching}
+                  variant={isFetching ? "destructive" : "default"}
+                  className={
+                    isFetching
+                      ? undefined
+                      : "bg-brand text-brand-foreground hover:bg-brand/90"
+                  }
+                >
+                  {isFetching ? "Stop" : "Start"}
+                </Button>
               </div>
+            </div>
 
+            <div className="grid gap-5 sm:grid-cols-2">
               <div className="space-y-2">
-                <div className="flex justify-between">
-                  <label htmlFor="refresh-rate" className="text-sm font-medium">
-                    Refresh Rate: {refreshRate} seconds
+                <div className="flex items-baseline justify-between">
+                  <label htmlFor="refresh-rate" className="text-xs font-medium text-muted-foreground">
+                    Refresh rate
                   </label>
+                  <span className="text-xs tabular-nums text-foreground">
+                    {refreshRate}s
+                  </span>
                 </div>
                 <Slider
                   id="refresh-rate"
@@ -248,10 +275,13 @@ export default function RedditLiveComments() {
               </div>
 
               <div className="space-y-2">
-                <div className="flex justify-between">
-                  <label htmlFor="display-rate" className="text-sm font-medium">
-                    Display Rate: {displayRate} seconds per comment
+                <div className="flex items-baseline justify-between">
+                  <label htmlFor="display-rate" className="text-xs font-medium text-muted-foreground">
+                    Display pace
                   </label>
+                  <span className="text-xs tabular-nums text-foreground">
+                    {displayRate}s / comment
+                  </span>
                 </div>
                 <Slider
                   id="display-rate"
@@ -265,39 +295,37 @@ export default function RedditLiveComments() {
               </div>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {error && (
-          <div className="p-4 text-red-500 bg-red-50 border-b text-sm">
+      {error && (
+        <div className="mx-auto w-full max-w-2xl px-4 pt-3">
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
             {error}
           </div>
-        )}
+        </div>
+      )}
 
-        <div ref={commentsContainerRef} className="flex-1 overflow-y-auto">
-          {displayedComments.length === 0 &&
-          queuedComments.length === 0 &&
-          !isLoading ? (
-            <div className="flex items-center justify-center h-full text-gray-500">
-              {isFetching
-                ? "Waiting for comments..."
-                : "Enter a Reddit post URL and click Start"}
-            </div>
+      {/* Feed */}
+      <div
+        ref={commentsContainerRef}
+        className="thin-scroll flex-1 overflow-y-auto"
+      >
+        <div className="mx-auto w-full max-w-2xl px-2 py-3 sm:px-4">
+          {!hasFeed && !isLoading ? (
+            <EmptyState isFetching={isFetching} />
           ) : (
-            <div className="flex flex-col space-y-3 p-4 max-w-3xl mx-auto">
-              {displayedComments.map((comment, index) => (
-                <Comment
-                  key={comment.id}
-                  comment={comment}
-                  isNew={index < 5}
-                  newIndex={index}
-                />
+            <div className="flex flex-col gap-0.5">
+              {displayedComments.map((comment) => (
+                <Comment key={comment.id} comment={comment} />
               ))}
             </div>
           )}
 
-          {isLoading && comments.length === 0 && (
-            <div className="flex justify-center p-4">
-              <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
+          {isLoading && !hasFeed && (
+            <div className="flex flex-col items-center justify-center gap-3 py-24 text-muted-foreground">
+              <span className="h-5 w-5 animate-spin rounded-full border-2 border-brand border-t-transparent" />
+              <p className="text-sm">Loading comments…</p>
             </div>
           )}
         </div>
@@ -306,3 +334,28 @@ export default function RedditLiveComments() {
   );
 }
 
+function EmptyState({ isFetching }: { isFetching: boolean }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-3 px-6 py-24 text-center">
+      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-brand/10">
+        <MessageSquareText className="h-6 w-6 text-brand" />
+      </div>
+      {isFetching ? (
+        <>
+          <p className="text-sm font-medium text-foreground">Waiting for comments…</p>
+          <p className="max-w-xs text-sm text-muted-foreground">
+            New reactions will stream in here as they&apos;re posted.
+          </p>
+        </>
+      ) : (
+        <>
+          <p className="text-sm font-medium text-foreground">Watch a thread go live</p>
+          <p className="max-w-xs text-sm text-muted-foreground">
+            Paste a Reddit post URL above and press Start to stream its comments
+            in real time.
+          </p>
+        </>
+      )}
+    </div>
+  );
+}

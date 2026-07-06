@@ -1,7 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 export interface RedditComment {
@@ -17,105 +15,51 @@ export interface RedditComment {
 
 interface CommentProps {
   comment: RedditComment;
-  isNew?: boolean;
-  newIndex?: number;
 }
 
-export default function Comment({
-  comment,
-  isNew = false,
-  newIndex = 0,
-}: CommentProps) {
-  const [visible, setVisible] = useState(false);
+const timeAgo = (timestamp: number) => {
+  const seconds = Math.floor(Date.now() / 1000 - timestamp);
+  if (seconds < 5) return "now";
+  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
+  return `${Math.floor(seconds / 86400)}d`;
+};
 
-  useEffect(() => {
-    // Small delay to trigger animation
-    const timer = setTimeout(() => {
-      setVisible(true);
-    }, 50);
+const getInitials = (name: string) =>
+  name.replace(/^u\//, "").slice(0, 2).toUpperCase();
 
-    return () => clearTimeout(timer);
-  }, []);
-
-  const timeAgo = (timestamp: number) => {
-    const seconds = Math.floor(Date.now() / 1000 - timestamp);
-
-    if (seconds < 60) return `${seconds}s`;
-    if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
-    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
-    return `${Math.floor(seconds / 86400)}d`;
-  };
-
-  const getInitials = (name: string) => {
-    return name.substring(0, 2).toUpperCase();
-  };
-
-  // Use specific Tailwind blue classes that we know exist
-  const getHighlightColor = () => {
-    if (!isNew) return "border-l-zinc-200";
-    switch (newIndex) {
-      case 0:
-        return "border-l-zinc-600";
-      case 1:
-        return "border-l-zinc-500";
-      case 2:
-        return "border-l-zinc-400";
-      case 3:
-        return "border-l-zinc-400";
-      case 4:
-        return "border-l-zinc-300";
-      default:
-        return "border-l-stone-200";
-    }
-  };
-
-  const getbgColor = () => {
-    if (!isNew) return "bg-stone-50";
-    switch (newIndex) {
-      case 0:
-        return "bg-stone-300";
-      case 1:
-        return "bg-stone-200";
-      case 2:
-        return "bg-stone-100";
-      case 3:
-        return "bg-stone-100";
-      case 4:
-        return "bg-stone-100";
-      default:
-        return "bg-stone-100";
-    }
-  };
+export default function Comment({ comment }: CommentProps) {
+  const deleted = comment.author === "[deleted]";
 
   return (
-    <div
-      className={cn(
-        "transition-all duration-500 ease-in-out",
-        visible
-          ? "opacity-100 transform translate-y-0"
-          : "opacity-0 transform -translate-y-4"
-      )}
-    >
-      <Card
-        className={cn(
-          "border-l-4 hover:border-l-zinc-600",
-          getHighlightColor()
-        )}
+    <div className="group flex gap-3 rounded-lg px-2 py-2 animate-comment-in animate-highlight-fade">
+
+      <div
+        aria-hidden
+        className="mt-0.5 flex h-8 w-8 shrink-0 select-none items-center justify-center rounded-full bg-secondary text-[11px] font-semibold text-secondary-foreground/80"
       >
-        <CardContent className={cn("p-3 hover:bg-stone-400", getbgColor())}>
-          <div className="flex items-start space-x-3">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center space-x-2">
-                <div className="font-medium truncate">{comment.author}</div>
-                <div className="text-xs text-gray-600">
-                  {timeAgo(comment.created)}
-                </div>
-              </div>
-              <div className="text-sm break-words">{comment.body}</div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+        {deleted ? "—" : getInitials(comment.author)}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline gap-2">
+          <span
+            className={cn(
+              "truncate text-sm font-semibold",
+              deleted ? "text-muted-foreground italic" : "text-foreground"
+            )}
+          >
+            {deleted ? "[deleted]" : comment.author}
+          </span>
+          <time className="shrink-0 text-xs tabular-nums text-muted-foreground">
+            {timeAgo(comment.created)}
+          </time>
+        </div>
+        <p className="mt-0.5 whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90 [overflow-wrap:anywhere]">
+          {comment.body}
+        </p>
+      </div>
     </div>
   );
 }

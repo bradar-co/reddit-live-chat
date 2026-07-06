@@ -25,6 +25,10 @@ const config: Config = {
   				DEFAULT: 'hsl(var(--primary))',
   				foreground: 'hsl(var(--primary-foreground))'
   			},
+  			brand: {
+  				DEFAULT: 'hsl(var(--brand))',
+  				foreground: 'hsl(var(--brand-foreground))'
+  			},
   			secondary: {
   				DEFAULT: 'hsl(var(--secondary))',
   				foreground: 'hsl(var(--secondary-foreground))'
@@ -83,11 +87,26 @@ const config: Config = {
   				to: {
   					height: '0'
   				}
+  			},
+  			'comment-in': {
+  				'0%': { opacity: '0', transform: 'translateY(-6px)' },
+  				'100%': { opacity: '1', transform: 'translateY(0)' }
+  			},
+  			'highlight-fade': {
+  				'0%': { backgroundColor: 'hsl(var(--brand) / 0.14)' },
+  				'100%': { backgroundColor: 'hsl(var(--brand) / 0)' }
+  			},
+  			'live-pulse': {
+  				'0%, 100%': { opacity: '1', transform: 'scale(1)' },
+  				'50%': { opacity: '0.45', transform: 'scale(0.8)' }
   			}
   		},
   		animation: {
   			'accordion-down': 'accordion-down 0.2s ease-out',
-  			'accordion-up': 'accordion-up 0.2s ease-out'
+  			'accordion-up': 'accordion-up 0.2s ease-out',
+  			'comment-in': 'comment-in 0.25s cubic-bezier(0.22, 1, 0.36, 1)',
+  			'highlight-fade': 'highlight-fade 1.6s ease-out forwards',
+  			'live-pulse': 'live-pulse 1.4s ease-in-out infinite'
   		}
   	}
   },
