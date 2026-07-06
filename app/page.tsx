@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,16 @@ export default function RedditLiveComments() {
   const [queuedComments, setQueuedComments] = useState<RedditComment[]>([])
   const [seenComments, setSeenComments] = useState<Set<string>>(new Set())
   const [effectiveDisplayRate, setEffectiveDisplayRate] = useState(displayRate);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+
+  const toggleExpanded = useCallback((id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
 
   const {
     comments,
@@ -142,6 +152,7 @@ export default function RedditLiveComments() {
     setSeenComments(new Set());
     setQueuedComments([]);
     setDisplayedComments([]);
+    setExpandedIds(new Set());
   }, [postUrl]);
 
   const validateUrl = (url: string) =>
@@ -165,7 +176,7 @@ export default function RedditLiveComments() {
   return (
     <div className="flex h-[100dvh] flex-col bg-background text-foreground">
       {/* Header */}
-      <header className="sticky top-0 z-20 border-b border-border bg-background/80 backdrop-blur-md">
+      <header className="sticky top-0 z-20 border-b border-border bg-background/95 shadow-sm backdrop-blur-md supports-[backdrop-filter]:bg-background/90">
         {/* Refresh countdown line */}
         <div className="h-0.5 w-full bg-transparent">
           {isFetching && (
@@ -317,7 +328,12 @@ export default function RedditLiveComments() {
           ) : (
             <div className="flex flex-col gap-0.5">
               {displayedComments.map((comment) => (
-                <Comment key={comment.id} comment={comment} />
+                <Comment
+                  key={comment.id}
+                  comment={comment}
+                  expandedIds={expandedIds}
+                  onToggle={toggleExpanded}
+                />
               ))}
             </div>
           )}

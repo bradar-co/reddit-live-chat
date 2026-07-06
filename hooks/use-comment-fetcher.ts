@@ -3,6 +3,34 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import type { RedditComment } from "@/components/comment"
 
+// Map one Reddit comment node (`t1` data) to our shape, recursing into its
+// replies so nested threads survive instead of being dropped.
+function mapCommentNode(d: any): RedditComment {
+  return {
+    id: d.id,
+    author: d.author || "[deleted]",
+    body: d.body || "[removed]",
+    score: d.score || 0,
+    created: d.created_utc || Date.now() / 1000,
+    permalink: d.permalink,
+    replies: parseReplyListing(d.replies),
+  }
+}
+
+// Reddit sets `replies` to "" when there are none, or to a Listing whose
+// children hold the reply comments (plus "more" stubs we skip).
+function parseReplyListing(replies: any): RedditComment[] {
+  const children = replies?.data?.children
+  if (!Array.isArray(children)) return []
+  const out: RedditComment[] = []
+  for (const child of children) {
+    if (child?.kind === "t1" && child.data) {
+      out.push(mapCommentNode(child.data))
+    }
+  }
+  return out
+}
+
 export function useCommentFetcher(postUrl: string | null, interval: number = 30000) {
   const [comments, setComments] = useState<RedditComment[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -50,9 +78,10 @@ export function useCommentFetcher(postUrl: string | null, interval: number = 300
       // This creates a script element to bypass CORS
       return new Promise<void>((resolve, reject) => {
         const callbackName = `redditJsonpCallback_${Date.now()}`
+        const globalScope = window as any
 
         // Create global callback function
-        window[callbackName as any] = (data: any) => {
+        globalScope[callbackName] = (data: any) => {
           try {
             // Extract post title if available
             if (data[0]?.data?.children?.[0]?.data?.title) {
@@ -66,7 +95,8 @@ export function useCommentFetcher(postUrl: string | null, interval: number = 300
 
             const newComments: RedditComment[] = []
 
-            // Process comments
+            // Process comments. Dedup is by top-level comment id; each new one
+            // carries its full (already-fetched) reply tree along with it.
             data[1].data.children.forEach((child: any) => {
               if (child.kind === "t1" && child.data) {
                 const commentData = child.data
@@ -77,13 +107,8 @@ export function useCommentFetcher(postUrl: string | null, interval: number = 300
                   commentIdsRef.current.add(commentId)
 
                   newComments.push({
-                    id: commentId,
-                    author: commentData.author || "[deleted]",
-                    body: commentData.body || "[removed]",
-                    score: commentData.score || 0,
-                    created: commentData.created_utc || Date.now() / 1000,
-                    permalink: commentData.permalink,
-                    isNew: true  // Mark new comments
+                    ...mapCommentNode(commentData),
+                    isNew: true, // Mark new comments
                   })
                 }
               }
@@ -99,7 +124,7 @@ export function useCommentFetcher(postUrl: string | null, interval: number = 300
 
             // Clean up
             document.body.removeChild(script)
-            delete window[callbackName as any]
+            delete globalScope[callbackName]
 
             setIsLoading(false)
             resolve()
@@ -118,7 +143,7 @@ export function useCommentFetcher(postUrl: string | null, interval: number = 300
         script.src = `https://old.reddit.com/comments/${postId}.json?limit=100&sort=new&raw_json=1&jsonp=${callbackName}`
         script.onerror = () => {
           document.body.removeChild(script)
-          delete window[callbackName as any]
+          delete globalScope[callbackName]
           setError("Failed to fetch comments from Reddit")
           setIsLoading(false)
           reject(new Error("Script load error"))
